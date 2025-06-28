@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Verify Level 1</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
@@ -10,8 +9,8 @@
     body {
       font-family: sans-serif;
       text-align: center;
-      background: #f4f4f4;
       padding: 2rem;
+      background: #f3f3f3;
     }
     button {
       padding: 1rem 2rem;
@@ -23,47 +22,59 @@
       cursor: pointer;
       margin: 1rem;
     }
-    button:disabled {
-      background-color: #aaa;
-      cursor: not-allowed;
-    }
     #status {
       margin-top: 1rem;
-      color: #333;
+      font-size: 0.9rem;
     }
   </style>
 </head>
 <body>
-  <h2 id="title">Verify Level 1</h2>
+  <h2>Verify Level 1</h2>
   <button id="connectBtn" onclick="connectWallet()">Connect Wallet</button>
-  <button id="approveBtn" onclick="approve()" disabled>Approve NWR5</button>
+  <button id="approveBtn" onclick="approveNWR5()" disabled>Approve NWR5</button>
   <button id="verifyBtn" onclick="verifyLevel1()" disabled>Verify Level 1</button>
-  <div id="status">Disconnected</div>
+  <div id="status">🔌 Disconnected</div>
 
   <script>
     const VAULT_ADDRESS = "0x63796f70f91B005201768568e6cC0827d9158094";
-    const TOKEN_ADDRESS = "0x2E571B5F2934380D0515ff08D69FFa26A0a0394D"; // NWR5 Token
-    const APPROVE_AMOUNT = web3.utils.toWei("10000", "ether");
-
-    const VAULT_ABI = [
-      { "inputs": [{"internalType": "uint8", "name": "level", "type": "uint8"}], "name": "contributeAndVerifyLevel", "outputs": [], "stateMutability": "nonpayable", "type": "function" }
+    const TOKEN_ADDRESS = "0x2E571B5F2934380D0515ff08D69FFa26A0a0394D";
+    const TOKEN_ABI = [
+      { "constant": false, "inputs": [
+        { "name": "spender", "type": "address" },
+        { "name": "amount", "type": "uint256" }
+      ], "name": "approve", "outputs": [{ "name": "", "type": "bool" }],
+        "stateMutability": "nonpayable", "type": "function"
+      }
     ];
-    const ERC20_ABI = [
-      { "constant": false, "inputs": [ { "name": "spender", "type": "address" }, { "name": "amount", "type": "uint256" } ], "name": "approve", "outputs": [ { "name": "", "type": "bool" } ], "type": "function" },
-      { "constant": true, "inputs": [ { "name": "owner", "type": "address" }, { "name": "spender", "type": "address" } ], "name": "allowance", "outputs": [ { "name": "", "type": "uint256" } ], "type": "function" },
-      { "constant": true, "inputs": [ { "name": "account", "type": "address" } ], "name": "balanceOf", "outputs": [ { "name": "", "type": "uint256" } ], "type": "function" }
+    const VAULT_ABI = [
+      { "inputs": [{ "internalType": "uint8", "name": "level", "type": "uint8" }],
+        "name": "contributeAndVerifyLevel", "outputs": [], "stateMutability": "nonpayable", "type": "function"
+      }
     ];
 
     let web3;
+    let provider;
     let account;
-    let vault, token;
 
     async function connectWallet() {
       if (window.ethereum) {
-        web3 = new Web3(window.ethereum);
-        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        provider = window.ethereum;
+        await provider.request({ method: 'eth_requestAccounts' });
+        web3 = new Web3(provider);
+        const chainId = await web3.eth.getChainId();
+        if (chainId !== 137) {
+          try {
+            await provider.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x89' }]
+            });
+          } catch (switchError) {
+            document.getElementById("status").innerText = `❌ Please switch to Polygon manually.`;
+            return;
+          }
+        }
       } else {
-        const provider = new WalletConnectProvider.default({
+        provider = new WalletConnectProvider.default({
           rpc: { 137: "https://polygon-rpc.com" },
           chainId: 137
         });
@@ -73,26 +84,17 @@
 
       const accounts = await web3.eth.getAccounts();
       account = accounts[0];
-
-      vault = new web3.eth.Contract(VAULT_ABI, VAULT_ADDRESS);
-      token = new web3.eth.Contract(ERC20_ABI, TOKEN_ADDRESS);
-
-      document.getElementById("status").innerText = `Connected: ${account}`;
-
-      const balance = await token.methods.balanceOf(account).call();
-      if (web3.utils.toBN(balance).gte(web3.utils.toBN(APPROVE_AMOUNT))) {
-        document.getElementById("approveBtn").disabled = false;
-      } else {
-        document.getElementById("status").innerText += "\n❌ Not enough NWR5";
-      }
+      document.getElementById("status").innerText = `✅ Connected: ${account}`;
+      document.getElementById("approveBtn").disabled = false;
     }
 
-    async function approve() {
+    async function approveNWR5() {
       try {
-        document.getElementById("status").innerText = "🔄 Approving...";
-        await token.methods.approve(VAULT_ADDRESS, APPROVE_AMOUNT).send({ from: account });
+        const token = new web3.eth.Contract(TOKEN_ABI, TOKEN_ADDRESS);
+        const amount = web3.utils.toWei("10000", "ether");
+        await token.methods.approve(VAULT_ADDRESS, amount).send({ from: account });
+        document.getElementById("status").innerText = `✅ Approved 10,000 NWR5`;
         document.getElementById("verifyBtn").disabled = false;
-        document.getElementById("status").innerText = "✅ Approved NWR5";
       } catch (e) {
         document.getElementById("status").innerText = `❌ Approval failed: ${e.message}`;
       }
@@ -100,11 +102,11 @@
 
     async function verifyLevel1() {
       try {
-        document.getElementById("status").innerText = "🔄 Verifying Level 1...";
+        const vault = new web3.eth.Contract(VAULT_ABI, VAULT_ADDRESS);
         await vault.methods.contributeAndVerifyLevel(1).send({ from: account });
-        document.getElementById("status").innerText = "✅ Level 1 Verified!";
+        document.getElementById("status").innerText = "✅ Successfully Verified Level 1!";
       } catch (e) {
-        document.getElementById("status").innerText = `❌ Verify failed: ${e.message}`;
+        document.getElementById("status").innerText = `❌ Error: ${e.message}`;
       }
     }
   </script>
