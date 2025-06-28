@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Level 1</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+  <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 2rem;
+      background: #f3f3f3;
+    }
+    button {
+      padding: 1rem 2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      background-color: #5c67f2;
+      color: white;
+      cursor: pointer;
+      margin: 1rem;
+    }
+    #status {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <h2>Verify Level 1</h2>
+  <button onclick="connectWallet()">Connect Wallet</button>
+  <button onclick="verifyLevel1()">Verify Level 1</button>
+  <div id="status">Disconnected</div>
+
+  <script>
+    const VAULT_ADDRESS = "0x63796f70f91B005201768568e6cC0827d9158094";
+    const VAULT_ABI = [
+      {
+        "inputs": [{"internalType": "uint8", "name": "level", "type": "uint8"}],
+        "name": "contributeAndVerifyLevel",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ];
+
+    let web3;
+    let provider;
+    let account;
+
+    async function connectWallet() {
+      if (window.ethereum) {
+        provider = window.ethereum;
+        await provider.request({ method: 'eth_requestAccounts' });
+        web3 = new Web3(provider);
+      } else {
+        provider = new WalletConnectProvider.default({
+          rpc: {
+            137: "https://polygon-rpc.com"
+          },
+          chainId: 137
+        });
+        await provider.enable();
+        web3 = new Web3(provider);
+      }
+      const accounts = await web3.eth.getAccounts();
+      account = accounts[0];
+      document.getElementById("status").innerText = `Connected: ${account}`;
+    }
+
+    async function verifyLevel1() {
+      if (!web3 || !account) return alert("Connect wallet first");
+      try {
+        const vault = new web3.eth.Contract(VAULT_ABI, VAULT_ADDRESS);
+        const tx = await vault.methods.contributeAndVerifyLevel(1).send({ from: account });
+        document.getElementById("status").innerText = "✅ Verified Level 1!";
+      } catch (e) {
+        document.getElementById("status").innerText = `❌ Error: ${e.message}`;
+      }
+    }
+  </script>
+</body>
+</html>
