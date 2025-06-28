@@ -26,29 +26,31 @@
       margin-top: 1rem;
       font-size: 0.9rem;
     }
+    #verifyBtn {
+      display: none;
+    }
   </style>
 </head>
 <body>
   <h2>Verify Level 1</h2>
   <button onclick="connectWallet()">Connect Wallet</button>
-  <button onclick="verifyLevel1()">Verify Level 1</button>
+  <button id="approveBtn" onclick="approveNWR5()">Approve NWR5</button>
+  <button id="verifyBtn" onclick="verifyLevel1()">Verify Level 1</button>
   <div id="status">Disconnected</div>
 
   <script>
     const VAULT_ADDRESS = "0x63796f70f91B005201768568e6cC0827d9158094";
+    const NWR5_ADDRESS = "0x2E571B5F2934380D0515ff08D69FFa26A0a0394D"; // Confirm this is correct
     const VAULT_ABI = [
-      {
-        "inputs": [{"internalType": "uint8", "name": "level", "type": "uint8"}],
-        "name": "contributeAndVerifyLevel",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      }
+      { "inputs": [{"internalType": "uint8", "name": "level", "type": "uint8"}], "name": "contributeAndVerifyLevel", "outputs": [], "stateMutability": "nonpayable", "type": "function" }
+    ];
+    const ERC20_ABI = [
+      { "constant": false, "inputs": [{"name": "spender", "type": "address"}, {"name": "amount", "type": "uint256"}], "name": "approve", "outputs": [{"name": "", "type": "bool"}], "type": "function" },
+      { "constant": true, "inputs": [{"name": "owner", "type": "address"}, {"name": "spender", "type": "address"}], "name": "allowance", "outputs": [{"name": "", "type": "uint256"}], "type": "function" }
     ];
 
-    let web3;
-    let provider;
-    let account;
+    let web3, provider, account;
+    const level1Cost = "10000000000000000000000"; // 10,000 NWR5 (18 decimals)
 
     async function connectWallet() {
       if (window.ethereum) {
@@ -57,9 +59,7 @@
         web3 = new Web3(provider);
       } else {
         provider = new WalletConnectProvider.default({
-          rpc: {
-            137: "https://polygon-rpc.com"
-          },
+          rpc: { 137: "https://polygon-rpc.com" },
           chainId: 137
         });
         await provider.enable();
@@ -70,11 +70,23 @@
       document.getElementById("status").innerText = `Connected: ${account}`;
     }
 
+    async function approveNWR5() {
+      if (!web3 || !account) return alert("Connect wallet first");
+      try {
+        const token = new web3.eth.Contract(ERC20_ABI, NWR5_ADDRESS);
+        await token.methods.approve(VAULT_ADDRESS, level1Cost).send({ from: account });
+        document.getElementById("status").innerText = "✅ Approved! Now verify.";
+        document.getElementById("verifyBtn").style.display = "inline-block";
+      } catch (e) {
+        document.getElementById("status").innerText = `❌ Approval failed: ${e.message}`;
+      }
+    }
+
     async function verifyLevel1() {
       if (!web3 || !account) return alert("Connect wallet first");
       try {
         const vault = new web3.eth.Contract(VAULT_ABI, VAULT_ADDRESS);
-        const tx = await vault.methods.contributeAndVerifyLevel(1).send({ from: account });
+        await vault.methods.contributeAndVerifyLevel(1).send({ from: account });
         document.getElementById("status").innerText = "✅ Verified Level 1!";
       } catch (e) {
         document.getElementById("status").innerText = `❌ Error: ${e.message}`;
