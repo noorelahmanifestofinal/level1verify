@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Verify Level 1</title>
@@ -26,70 +26,97 @@
       margin-top: 1rem;
       font-size: 0.9rem;
     }
-    #verifyBtn {
-      display: none;
-    }
   </style>
 </head>
 <body>
-  <h2>Verify Level 1</h2>
-  <button onclick="connectWallet()">Connect Wallet</button>
-  <button id="approveBtn" onclick="approveNWR5()">Approve NWR5</button>
-  <button id="verifyBtn" onclick="verifyLevel1()">Verify Level 1</button>
+  <h2 id="title">Verify Level 1</h2>
+  <button id="connectBtn" onclick="connectWallet()">Connect Wallet</button>
+  <button id="approveBtn" onclick="approve()" disabled>Approve</button>
+  <button id="verifyBtn" onclick="verifyLevel1()" disabled>Verify Level 1</button>
   <div id="status">Disconnected</div>
 
   <script>
     const VAULT_ADDRESS = "0x63796f70f91B005201768568e6cC0827d9158094";
-    const NWR5_ADDRESS = "0x2E571B5F2934380D0515ff08D69FFa26A0a0394D"; // Confirm this is correct
-    const VAULT_ABI = [
-      { "inputs": [{"internalType": "uint8", "name": "level", "type": "uint8"}], "name": "contributeAndVerifyLevel", "outputs": [], "stateMutability": "nonpayable", "type": "function" }
-    ];
-    const ERC20_ABI = [
-      { "constant": false, "inputs": [{"name": "spender", "type": "address"}, {"name": "amount", "type": "uint256"}], "name": "approve", "outputs": [{"name": "", "type": "bool"}], "type": "function" },
-      { "constant": true, "inputs": [{"name": "owner", "type": "address"}, {"name": "spender", "type": "address"}], "name": "allowance", "outputs": [{"name": "", "type": "uint256"}], "type": "function" }
-    ];
+    const NWR5_ADDRESS = "YOUR_NWR5_TOKEN_ADDRESS"; // <-- replace with actual
+    const VAULT_ABI = [{ "inputs": [{ "internalType": "uint8", "name": "level", "type": "uint8" }], "name": "contributeAndVerifyLevel", "outputs": [], "stateMutability": "nonpayable", "type": "function" }];
+    const ERC20_ABI = [{ "constant": false, "inputs": [ { "name": "_spender", "type": "address" }, { "name": "_value", "type": "uint256" } ], "name": "approve", "outputs": [ { "name": "", "type": "bool" } ], "type": "function" }, { "constant": true, "inputs": [ { "name": "_owner", "type": "address" } ], "name": "balanceOf", "outputs": [ { "name": "balance", "type": "uint256" } ], "type": "function" }];
+
+    const translations = {
+      en: { connect: "Connect Wallet", approve: "Approve", verify: "Verify Level 1", disconnected: "Disconnected", success: "✅ Verified!", error: "❌ Error" },
+      km: { connect: "ភ្ជាប់កាបូប", approve: "អនុញ្ញាត", verify: "ផ្ទៀងផ្ទាត់កម្រិត 1", disconnected: "មិនបានភ្ជាប់", success: "✅ បានផ្ទៀងផ្ទាត់!", error: "❌ បញ្ហា" },
+      es: { connect: "Conectar Billetera", approve: "Aprobar", verify: "Verificar Nivel 1", disconnected: "Desconectado", success: "✅ Verificado!", error: "❌ Error" },
+      hi: { connect: "वॉलेट कनेक्ट करें", approve: "अनुमोदन करें", verify: "स्तर 1 सत्यापित करें", disconnected: "डिस्कनेक्टेड", success: "✅ सत्यापित!", error: "❌ त्रुटि" },
+      zh: { connect: "连接钱包", approve: "授权", verify: "验证等级 1", disconnected: "未连接", success: "✅ 已验证!", error: "❌ 错误" },
+      fr: { connect: "Connecter le portefeuille", approve: "Approuver", verify: "Vérifier Niveau 1", disconnected: "Déconnecté", success: "✅ Vérifié!", error: "❌ Erreur" },
+      ar: { connect: "اتصل بالمحفظة", approve: "وافق", verify: "تحقق من المستوى 1", disconnected: "غير متصل", success: "✅ تم التحقق!", error: "❌ خطأ" },
+      ja: { connect: "ウォレット接続", approve: "承認", verify: "レベル1を確認", disconnected: "未接続", success: "✅ 確認済み!", error: "❌ エラー" },
+      de: { connect: "Wallet verbinden", approve: "Genehmigen", verify: "Level 1 verifizieren", disconnected: "Getrennt", success: "✅ Verifiziert!", error: "❌ Fehler" },
+      ru: { connect: "Подключить кошелёк", approve: "Одобрить", verify: "Подтвердить уровень 1", disconnected: "Отключено", success: "✅ Подтверждено!", error: "❌ Ошибка" },
+      ko: { connect: "지갑 연결", approve: "승인", verify: "1단계 인증", disconnected: "연결 안 됨", success: "✅ 인증됨!", error: "❌ 오류" }
+    };
 
     let web3, provider, account;
-    const level1Cost = "10000000000000000000000"; // 10,000 NWR5 (18 decimals)
 
-    async function connectWallet() {
-      if (window.ethereum) {
-        provider = window.ethereum;
-        await provider.request({ method: 'eth_requestAccounts' });
-        web3 = new Web3(provider);
-      } else {
-        provider = new WalletConnectProvider.default({
-          rpc: { 137: "https://polygon-rpc.com" },
-          chainId: 137
-        });
-        await provider.enable();
-        web3 = new Web3(provider);
-      }
-      const accounts = await web3.eth.getAccounts();
-      account = accounts[0];
-      document.getElementById("status").innerText = `Connected: ${account}`;
+    function setLangUI(lang) {
+      const t = translations[lang] || translations.en;
+      document.getElementById("connectBtn").innerText = t.connect;
+      document.getElementById("approveBtn").innerText = t.approve;
+      document.getElementById("verifyBtn").innerText = t.verify;
+      document.getElementById("status").innerText = t.disconnected;
     }
 
-    async function approveNWR5() {
-      if (!web3 || !account) return alert("Connect wallet first");
+    window.onload = () => {
+      const lang = navigator.language.slice(0, 2);
+      setLangUI(lang);
+    };
+
+    async function connectWallet() {
+      try {
+        if (window.ethereum) {
+          provider = window.ethereum;
+          await provider.request({ method: 'eth_requestAccounts' });
+          web3 = new Web3(provider);
+        } else {
+          provider = new WalletConnectProvider.default({ rpc: { 137: "https://polygon-rpc.com" }, chainId: 137 });
+          await provider.enable();
+          web3 = new Web3(provider);
+        }
+
+        const accounts = await web3.eth.getAccounts();
+        account = accounts[0];
+
+        const token = new web3.eth.Contract(ERC20_ABI, NWR5_ADDRESS);
+        const vault = new web3.eth.Contract(VAULT_ABI, VAULT_ADDRESS);
+
+        const balance = await token.methods.balanceOf(account).call();
+        if (Number(balance) >= 10000e18) {
+          document.getElementById("approveBtn").disabled = false;
+        }
+
+        document.getElementById("status").innerText = `✅ Connected: ${account}`;
+      } catch (e) {
+        document.getElementById("status").innerText = `❌ ${e.message}`;
+      }
+    }
+
+    async function approve() {
       try {
         const token = new web3.eth.Contract(ERC20_ABI, NWR5_ADDRESS);
-        await token.methods.approve(VAULT_ADDRESS, level1Cost).send({ from: account });
-        document.getElementById("status").innerText = "✅ Approved! Now verify.";
-        document.getElementById("verifyBtn").style.display = "inline-block";
+        await token.methods.approve(VAULT_ADDRESS, "10000000000000000000000").send({ from: account }); // 10,000 NWR5
+        document.getElementById("verifyBtn").disabled = false;
+        document.getElementById("status").innerText = "✅ Approved";
       } catch (e) {
-        document.getElementById("status").innerText = `❌ Approval failed: ${e.message}`;
+        document.getElementById("status").innerText = `❌ ${e.message}`;
       }
     }
 
     async function verifyLevel1() {
-      if (!web3 || !account) return alert("Connect wallet first");
       try {
         const vault = new web3.eth.Contract(VAULT_ABI, VAULT_ADDRESS);
         await vault.methods.contributeAndVerifyLevel(1).send({ from: account });
-        document.getElementById("status").innerText = "✅ Verified Level 1!";
+        document.getElementById("status").innerText = translations[navigator.language.slice(0, 2)]?.success || translations.en.success;
       } catch (e) {
-        document.getElementById("status").innerText = `❌ Error: ${e.message}`;
+        document.getElementById("status").innerText = `${translations[navigator.language.slice(0, 2)]?.error || translations.en.error}: ${e.message}`;
       }
     }
   </script>
